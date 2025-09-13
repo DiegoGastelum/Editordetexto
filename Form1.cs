@@ -157,10 +157,13 @@ namespace Editordetexto
                 i_caracter == 94 ||
                 i_caracter == 123 ||
                 i_caracter == 124 ||
-                i_caracter == 125
+                i_caracter == 125 ||
+                i_caracter == 46 || // punto .
+                i_caracter == 63 || // signo de interrogación ?
+                i_caracter == 126   // tilde ~
                 ) 
             { 
-                elemento = elemento + (char)i_caracter + "\n"; // simbolos validos
+                elemento = "Simbolo\n"; // simbolos validos
             } 
             else 
             { 

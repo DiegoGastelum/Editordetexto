@@ -129,7 +129,7 @@ namespace Editordetexto
             // compilarSoluciónToolStripMenuItem
             // 
             this.compilarSoluciónToolStripMenuItem.Name = "compilarSoluciónToolStripMenuItem";
-            this.compilarSoluciónToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.compilarSoluciónToolStripMenuItem.Size = new System.Drawing.Size(116, 22);
             this.compilarSoluciónToolStripMenuItem.Text = "Analizar";
             this.compilarSoluciónToolStripMenuItem.Click += new System.EventHandler(this.compilarSoluciónToolStripMenuItem_Click);
             // 
@@ -147,9 +147,9 @@ namespace Editordetexto
             // 
             this.TxtboxSalida.BackColor = System.Drawing.SystemColors.ScrollBar;
             this.TxtboxSalida.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.TxtboxSalida.Location = new System.Drawing.Point(0, 318);
+            this.TxtboxSalida.Location = new System.Drawing.Point(0, 381);
             this.TxtboxSalida.Name = "TxtboxSalida";
-            this.TxtboxSalida.Size = new System.Drawing.Size(800, 132);
+            this.TxtboxSalida.Size = new System.Drawing.Size(800, 69);
             this.TxtboxSalida.TabIndex = 2;
             this.TxtboxSalida.Text = "";
             this.TxtboxSalida.TextChanged += new System.EventHandler(this.TxtboxSalida_TextChanged);
