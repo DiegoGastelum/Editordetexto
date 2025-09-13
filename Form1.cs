@@ -201,7 +201,7 @@ namespace Editordetexto
                 }
                 else
                 {
-                    Error(i_caracter); // escape no reconocido
+                    Error(i_caracter); 
                 }
             }
             else
@@ -330,9 +330,8 @@ namespace Editordetexto
                         {
                             if (Comentario())
                             {
-                                // Guardar en el archivo .back que hay un comentario
                                 Escribir.Write("comentario\n");
-                                break; // saltar resto del flujo del switch
+                                break; 
                             }
                         }
                         Simbolo();
