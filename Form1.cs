@@ -375,17 +375,19 @@ namespace Editordetexto
         {
             P_Reservadas = new List<string>
             {
-                // Tipos de datos y almacenamiento
-                "auto", "register", "static", "extern", "typedef",
+                // Tipos de datos y modificadores
+                "void", "int", "float", "double", "char", "short", "long",
+                "signed", "unsigned", "const", "volatile", "restrict",
+
+                // Almacenamiento
+                "auto", "register", "static", "extern", "typedef", "inline",
 
                 // Control de flujo
-                "break", "case", "continue", "default", "do", "else", "for", "goto", "if",
-                "return", "switch", "while",
+                "if", "else", "switch", "case", "default",
+                "for", "while", "do", "break", "continue", "goto", "return",
 
-                // Tipos primitivos
-                "char", "const", "double", "enum", "float", "inline", "int", "long",
-                "restrict", "short", "signed", "sizeof", "struct", "union", "unsigned",
-                "void", "volatile",
+                // Estructuras de datos
+                "struct", "union", "enum", "sizeof",
 
                 // Extensiones C99
                 "_Bool", "_Complex", "_Imaginary",
@@ -396,7 +398,13 @@ namespace Editordetexto
 
                 // Preprocesador (directivas)
                 "define", "include", "ifdef", "ifndef", "endif", "undef",
-                "error", "pragma", "line"
+                "error", "pragma", "line",
+
+                // Funciones comunes de la biblioteca estándar
+                "main", "printf", "scanf", "gets", "puts", "fgets", "fputs",
+                "fopen", "fclose", "fread", "fwrite",
+                "malloc", "calloc", "realloc", "free",
+                "exit", "abort", "system","NULL"
             };
         }
 
@@ -413,5 +421,117 @@ namespace Editordetexto
         private void compilarToolStripMenuItem_Click(object sender, EventArgs e)
         {
         }
+
+        private void traducciónToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(CajaTxt1.Text)) return;
+
+            string archivoTrad = archivo.Remove(archivo.Length - 1) + "trad";
+
+            Dictionary<string, string> traducciones = new Dictionary<string, string>
+    {
+        // Tipos de datos y modificadores
+        { "void", "vacío" }, { "int", "entero" }, { "float", "flotante" },
+        { "double", "doble" }, { "char", "carácter" }, { "short", "corto" },
+        { "long", "largo" }, { "signed", "conSigno" }, { "unsigned", "sinSigno" },
+        { "const", "constante" }, { "volatile", "volátil" }, { "restrict", "restringido" },
+
+        // Almacenamiento
+        { "auto", "automático" }, { "register", "registro" }, { "static", "estático" },
+        { "extern", "externo" }, { "typedef", "tipoDefinido" }, { "inline", "enLinea" },
+
+        // Control de flujo
+        { "if", "si" }, { "else", "sino" }, { "switch", "según" }, { "case", "caso" },
+        { "default", "defecto" }, { "for", "para" }, { "while", "mientras" }, { "do", "hacer" },
+        { "break", "romper" }, { "continue", "continuar" }, { "goto", "irA" }, { "return", "retornar" },
+
+        // Estructuras de datos
+        { "struct", "estructura" }, { "union", "union" }, { "enum", "enumeración" }, { "sizeof", "tamaño" },
+
+        // Preprocesador
+        { "define", "definir" }, { "include", "incluir" }, { "ifdef", "siDefinido" },
+        { "ifndef", "siNoDefinido" }, { "endif", "finSi" }, { "undef", "noDefinir" },
+        { "error", "error" }, { "pragma", "pragma" }, { "line", "linea" },
+
+        // Funciones comunes
+        { "main", "principal" }, { "printf", "imprimir" }, { "scanf", "leer" },
+        { "gets", "obtener" }, { "puts", "imprimirLinea" }, { "fgets", "leerArchivo" },
+        { "fputs", "imprimirArchivo" }, { "fopen", "abrirArchivo" }, { "fclose", "cerrarArchivo" },
+        { "fread", "leerBinario" }, { "fwrite", "escribirBinario" }, { "malloc", "reservarMemoria" },
+        { "calloc", "reservarMemoriaCero" }, { "realloc", "reubicarMemoria" }, { "free", "liberarMemoria" },
+        { "exit", "salir" }, { "abort", "abortar" }, { "system", "sistema" }, { "NULL", "NULO" }
+    };
+
+            string contenido = CajaTxt1.Text;
+            StringBuilder traducido = new StringBuilder();
+
+            bool dentroComentarioLinea = false;
+            bool dentroComentarioBloque = false;
+            bool dentroCadena = false;
+
+            for (int i = 0; i < contenido.Length; i++)
+            {
+                char c = contenido[i];
+
+                // Detectar inicio y fin de comentarios y cadenas
+                if (!dentroCadena && !dentroComentarioBloque && c == '/' && i + 1 < contenido.Length && contenido[i + 1] == '/')
+                {
+                    dentroComentarioLinea = true;
+                    traducido.Append(c);
+                    continue;
+                }
+                if (!dentroCadena && !dentroComentarioLinea && c == '/' && i + 1 < contenido.Length && contenido[i + 1] == '*')
+                {
+                    dentroComentarioBloque = true;
+                    traducido.Append(c);
+                    continue;
+                }
+                if (dentroComentarioLinea && c == '\n') dentroComentarioLinea = false;
+                if (dentroComentarioBloque && c == '*' && i + 1 < contenido.Length && contenido[i + 1] == '/')
+                {
+                    dentroComentarioBloque = false;
+                    traducido.Append(c);
+                    i++; // saltar el '/'
+                    traducido.Append('/');
+                    continue;
+                }
+                if (!dentroComentarioLinea && !dentroComentarioBloque && c == '"') dentroCadena = !dentroCadena;
+
+                // Si estamos dentro de comentario o cadena, se copia tal cual
+                if (dentroComentarioLinea || dentroComentarioBloque || dentroCadena)
+                {
+                    traducido.Append(c);
+                    continue;
+                }
+
+                // Detectar palabras completas para traducir
+                if (char.IsLetter(c) || c == '_')
+                {
+                    int start = i;
+                    while (i < contenido.Length && (char.IsLetterOrDigit(contenido[i]) || contenido[i] == '_')) i++;
+                    string palabra = contenido.Substring(start, i - start);
+                    if (traducciones.ContainsKey(palabra))
+                    {
+                        traducido.Append(traducciones[palabra]);
+                    }
+                    else
+                    {
+                        traducido.Append(palabra);
+                    }
+                    i--; // ajustar posición
+                }
+                else
+                {
+                    traducido.Append(c);
+                }
+            }
+
+            // Guardar en archivo .trad
+            using (StreamWriter writer = new StreamWriter(archivoTrad))
+            {
+                writer.Write(traducido.ToString());
+            }
+        }
+
     }
 }
