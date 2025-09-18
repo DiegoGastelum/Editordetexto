@@ -328,10 +328,22 @@ namespace Editordetexto
                     case 's':
                         if (i_caracter == 47) // '/'
                         {
-                            if (Comentario())
+                            int siguiente = Leer.Peek(); // Ver el siguiente caracter 
+                            if (siguiente == 47 || siguiente == 42) // "//" o "/*"
                             {
-                                Escribir.Write("comentario\n");
-                                break; 
+                                if (Comentario())
+                                {
+                                    Escribir.Write("comentario\n");
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                // Operador de división
+                                elemento = "Simbolo\n";
+                                Escribir.Write(elemento);
+                                i_caracter = Leer.Read();
+                                break;
                             }
                         }
                         Simbolo();
