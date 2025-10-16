@@ -13,7 +13,7 @@ namespace Editordetexto
         StreamReader Leer;
         int i_caracter, N_error;
         char c_caracter;
-        string archivo, archivoback, elemento;
+        string archivo, archivoback, elemento,token;
         int Numero_linea;
         private List<string> P_Reservadas;
         /// <summary>
