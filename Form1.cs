@@ -221,19 +221,16 @@ namespace Editordetexto
         }
         private void Numero()
         {
-            // Detectar signo negativo
             if ((char)i_caracter == '-')
             {
-                i_caracter = Leer.Read(); // saltar el signo
+                i_caracter = Leer.Read();
             }
 
-            // Leer dígitos
             do
             {
                 i_caracter = Leer.Read();
             } while (Tipo_caracter(i_caracter) == 'd');
 
-            // Leer posible parte decimal
             if ((char)i_caracter == '.')
             {
                 Numero_Real();
@@ -485,17 +482,14 @@ namespace Editordetexto
 
         private void Declaracion()
         {
-            // token ya contiene el tipo de variable (int, float, etc.)
             token = Leer.ReadLine();
 
             if (token == "identificador")
             {
-                // Llamamos a Dec_VGlobal sin leer un nuevo token
                 Dec_VGlobal();
             }
             else if (token == "main")
             {
-                // Saltar hasta la apertura de llaves
                 do
                 {
                     token = Leer.ReadLine();
@@ -504,7 +498,7 @@ namespace Editordetexto
             }
             else if (token == ";")
             {
-                token = Leer.ReadLine(); // declaración vacía
+                token = Leer.ReadLine(); 
             }
             else
             {
@@ -517,17 +511,17 @@ namespace Editordetexto
         {
             while (token == "[")
             {
-                token = Leer.ReadLine(); // leer tamaño del arreglo
+                token = Leer.ReadLine(); 
 
                 if (token == "numero_entero" || token == "identificador")
                 {
-                    token = Leer.ReadLine(); // debe ser "]"
+                    token = Leer.ReadLine(); 
                     if (token != "]")
                     {
                         Error(token, "]");
                         return;
                     }
-                    token = Leer.ReadLine(); // siguiente token después de ]
+                    token = Leer.ReadLine(); 
                 }
                 else
                 {
@@ -569,22 +563,17 @@ namespace Editordetexto
 
         private void Dec_VGlobal()
         {
-            // token ya contiene "identificador"
-            // No hacemos Leer.ReadLine() aquí al inicio
             if (token != "identificador")
             {
                 Error("Se esperaba un identificador");
                 return;
             }
-
-            // Leemos siguiente token después del identificador
             token = Leer.ReadLine();
 
-            // Si es un arreglo, delegar a D_Arreglos
             if (token == "[")
             {
                 D_Arreglos();
-                return; // D_Arreglos() se encarga de avanzar token
+                return; 
             }
 
             // Inicialización opcional
@@ -600,14 +589,13 @@ namespace Editordetexto
                 token = Leer.ReadLine();
             }
 
-            // Fin de declaración
             if (token != ";")
             {
                 Error(token, ";");
                 return;
             }
 
-            token = Leer.ReadLine(); // continuar con siguiente declaración
+            token = Leer.ReadLine(); 
         }
 
         private void BloqueInicializacion()
@@ -618,18 +606,16 @@ namespace Editordetexto
                 return;
             }
 
-            token = Leer.ReadLine(); // leer primer valor dentro de { ... }
+            token = Leer.ReadLine(); 
 
             while (token != "}")
             {
                 if (token == "{")
                 {
-                    // Llamada recursiva para sub-arreglo
                     BloqueInicializacion();
                 }
                 else if (token == "numero_entero" || token == "numero_real" || token == "identificador" || token == "Cadena" || token == "caracter")
                 {
-                    // Valor simple
                     token = Leer.ReadLine();
                 }
                 else
@@ -638,14 +624,13 @@ namespace Editordetexto
                     return;
                 }
 
-                // Separador entre elementos
                 if (token == ",")
                 {
                     token = Leer.ReadLine();
                 }
                 else if (token == "}")
                 {
-                    break; // fin del bloque
+                    break; 
                 }
                 else
                 {
@@ -654,7 +639,7 @@ namespace Editordetexto
                 }
             }
 
-            token = Leer.ReadLine(); // avanzar al siguiente token después de '}' 
+            token = Leer.ReadLine();
         }
         private void TxtboxSalida_TextChanged(object sender, EventArgs e)
         {
@@ -732,13 +717,12 @@ namespace Editordetexto
                 {
                     dentroComentarioBloque = false;
                     traducido.Append(c);
-                    i++; // saltar el '/'
+                    i++; 
                     traducido.Append('/');
                     continue;
                 }
                 if (!dentroComentarioLinea && !dentroComentarioBloque && c == '"') dentroCadena = !dentroCadena;
 
-                // Si estamos dentro de comentario o cadena, se copia tal cual
                 if (dentroComentarioLinea || dentroComentarioBloque || dentroCadena)
                 {
                     traducido.Append(c);
@@ -759,7 +743,7 @@ namespace Editordetexto
                     {
                         traducido.Append(palabra);
                     }
-                    i--; // ajustar posición
+                    i--; 
                 }
                 else
                 {
