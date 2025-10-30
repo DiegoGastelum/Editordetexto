@@ -135,18 +135,26 @@ namespace Editordetexto
         }
         private void Simbolo()
         {
-            if (i_caracter == 33 ||
-                i_caracter >= 35 && i_caracter <= 38 ||
-                i_caracter >= 40 && i_caracter <= 45 ||
-                i_caracter == 47 ||
-                i_caracter >= 58 && i_caracter <= 62 ||
-                i_caracter == 91 || i_caracter == 93 ||
-                i_caracter == 94 || i_caracter == 123 ||
-                i_caracter == 124 || i_caracter == 125)
+            if (i_caracter == 10)
+            {
+                Numero_linea++;
+                elemento = "LF\n";
+            }
+            else if (i_caracter == 33 ||
+                     i_caracter >= 35 && i_caracter <= 38 ||
+                     i_caracter >= 40 && i_caracter <= 45 ||
+                     i_caracter == 47 ||
+                     i_caracter >= 58 && i_caracter <= 62 ||
+                     i_caracter == 91 || i_caracter == 93 ||
+                     i_caracter == 94 || i_caracter == 123 ||
+                     i_caracter == 124 || i_caracter == 125)
             {
                 elemento = ((char)i_caracter).ToString() + "\n";
             }
-            else { Error(i_caracter); }
+            else
+            {
+                Error(i_caracter);
+            }
         }
 
         private void Cadena()
@@ -154,15 +162,16 @@ namespace Editordetexto
             do
             {
                 i_caracter = Leer.Read();
-                if (i_caracter == 10) Numero_linea++;
-
+                if (i_caracter == 10) Numero_linea++; // Contar saltos dentro de cadenas
             } while (i_caracter != 34 && i_caracter != -1);
+
             if (i_caracter == -1) Error(-1);
         }
 
         private void Caracter()
         {
             i_caracter = Leer.Read();
+            if (i_caracter == 10) Numero_linea++; // Contar salto dentro de caracter
             if (i_caracter != 39) Error(39);
         }
 
@@ -184,9 +193,17 @@ namespace Editordetexto
 
         private void Archivo_Libreria()
         {
-            i_caracter = Leer.Read();
-            if ((char)i_caracter == 'h') { Escribir.Write("libreria\n"); i_caracter = Leer.Read(); }
-            else { Error(i_caracter); }
+            i_caracter = Leer.Read(); 
+
+            if ((char)i_caracter == 'h')
+            {
+                Escribir.Write("libreria\n"); // token completo
+                i_caracter = Leer.Read();
+            }
+            else
+            {
+                Error(i_caracter);
+            }
         }
 
         private bool Palabra_Reservada()
@@ -249,34 +266,31 @@ namespace Editordetexto
         private bool Comentario()
         {
             i_caracter = Leer.Read();
+
+            if (i_caracter == 10) Numero_linea++;
+
             switch (i_caracter)
             {
-                case 47:
-                    do
+                case 47: // //
+                    while (i_caracter != -1 && i_caracter != 10)
                     {
                         i_caracter = Leer.Read();
-                    } while (i_caracter != 10);
-                    return true;
-                case 42:
-                    do
-                    {
-                        do
-                        {
-                            i_caracter = Leer.Read();
-                            if (i_caracter == 10)
-                            {
-                                Numero_linea++;
-                            }
-                        } while (i_caracter != 42 && i_caracter != -1);
-                        i_caracter = Leer.Read();
-                    } while (i_caracter != 47 && i_caracter != -1);
-                    if (i_caracter == -1)
-                    {
-                        Error(i_caracter);
-
                     }
-                    i_caracter = Leer.Read();
+                    if (i_caracter == 10) Numero_linea++; // contar línea del salto final
                     return true;
+
+                case 42: // /* */
+                    int prev = 0;
+                    while (i_caracter != -1)
+                    {
+                        prev = i_caracter;
+                        i_caracter = Leer.Read();
+                        if (i_caracter == 10) Numero_linea++; 
+                        if (prev == 42 && i_caracter == 47) break; // fin de bloque
+                    }
+                    if (i_caracter == -1) Error(-1);
+                    return true;
+
                 default: return false;
             }
         }
@@ -333,26 +347,21 @@ namespace Editordetexto
         private void Cabecera()
         {
             token = Leer.ReadLine();
+            if (token == null || token == "Fin") return;
 
-            if (token == null || token == "Fin")
+            if (token == "LF") 
+            {
+                Numero_linea++;
+                Cabecera();
                 return;
+            }
 
             switch (token)
             {
                 case "#":
                     token = Leer.ReadLine();
-                    if (token == null)
-                    {
-                        Error("Directiva incompleta después de '#'");
-                        return;
-                    }
-
+                    if (token == null) { Error("Directiva incompleta después de '#'"); return; }
                     Directiva_proc();
-                    Cabecera();
-                    break;
-
-                case "LF":
-                    Numero_linea++;
                     Cabecera();
                     break;
 
@@ -379,19 +388,25 @@ namespace Editordetexto
 
         private int Directiva_include()
         {
+            while (token == "LF")
+            {
+                Numero_linea++;
+                token = Leer.ReadLine();
+            }
+
             if (token == "<")
             {
-                token = Leer.ReadLine();
+                token = Leer.ReadLine(); // debe ser "libreria"
                 if (token == "libreria")
                 {
-                    token = Leer.ReadLine();
+                    token = Leer.ReadLine(); // debe ser ">"
                     if (token == ">")
                     {
                         return 1;
                     }
                     else
                     {
-                        Error("Falta '>' en include");
+                        Error("Falta '>' en include"); // Número de línea correcto
                         return 0;
                     }
                 }
@@ -429,6 +444,7 @@ namespace Editordetexto
             {
                 case "include":
                     token = Leer.ReadLine();
+                    if (token != null) Numero_linea++;
                     while (token == "LF") token = Leer.ReadLine();
                     if (token == null)
                     {
@@ -439,6 +455,7 @@ namespace Editordetexto
 
                 case "define":
                     token = Leer.ReadLine();
+                    if (token != null) Numero_linea++;
                     while (token == "LF") token = Leer.ReadLine();
                     if (token == null)
                     {
@@ -483,6 +500,7 @@ namespace Editordetexto
         private void Declaracion()
         {
             token = Leer.ReadLine();
+            if (token != null) Numero_linea++;
 
             if (token == "identificador")
             {
@@ -498,7 +516,7 @@ namespace Editordetexto
             }
             else if (token == ";")
             {
-                token = Leer.ReadLine(); 
+                token = Leer.ReadLine();
             }
             else
             {
@@ -511,17 +529,20 @@ namespace Editordetexto
         {
             while (token == "[")
             {
-                token = Leer.ReadLine(); 
+                token = Leer.ReadLine();
+                if (token != null) Numero_linea++;
 
                 if (token == "numero_entero" || token == "identificador")
                 {
-                    token = Leer.ReadLine(); 
+                    token = Leer.ReadLine();
+                    if (token != null) Numero_linea++;
                     if (token != "]")
                     {
                         Error(token, "]");
                         return;
                     }
-                    token = Leer.ReadLine(); 
+                    token = Leer.ReadLine();
+                    if (token != null) Numero_linea++;
                 }
                 else
                 {
