@@ -193,7 +193,7 @@ namespace Editordetexto
 
         private void Archivo_Libreria()
         {
-            i_caracter = Leer.Read(); 
+            i_caracter = Leer.Read();
 
             if ((char)i_caracter == 'h')
             {
@@ -285,7 +285,7 @@ namespace Editordetexto
                     {
                         prev = i_caracter;
                         i_caracter = Leer.Read();
-                        if (i_caracter == 10) Numero_linea++; 
+                        if (i_caracter == 10) Numero_linea++;
                         if (prev == 42 && i_caracter == 47) break; // fin de bloque
                     }
                     if (i_caracter == -1) Error(-1);
@@ -299,10 +299,8 @@ namespace Editordetexto
         {
             TxtboxSalida.Text = "";
             guardar();
-
-            elemento = "";
             N_error = 0;
-            Numero_linea = 1;
+            elemento = "";
 
             archivoback = archivo.Remove(archivo.Length - 1) + "back";
             Escribir = new StreamWriter(archivoback);
@@ -338,10 +336,10 @@ namespace Editordetexto
 
             Escribir.Write("Fin\n");
 
-            TxtboxSalida.AppendText("Errores: " + N_error);
             Escribir.Close();
             Leer.Close();
             AnalizadorSintactico();
+            TxtboxSalida.AppendText("\r\nErrores: " + N_error + "\r\n");
         }
 
         private void Cabecera()
@@ -349,7 +347,7 @@ namespace Editordetexto
             token = Leer.ReadLine();
             if (token == null || token == "Fin") return;
 
-            if (token == "LF") 
+            if (token == "LF")
             {
                 Numero_linea++;
                 Cabecera();
@@ -594,7 +592,7 @@ namespace Editordetexto
             if (token == "[")
             {
                 D_Arreglos();
-                return; 
+                return;
             }
 
             // Inicialización opcional
@@ -616,7 +614,7 @@ namespace Editordetexto
                 return;
             }
 
-            token = Leer.ReadLine(); 
+            token = Leer.ReadLine();
         }
 
         private void BloqueInicializacion()
@@ -627,7 +625,7 @@ namespace Editordetexto
                 return;
             }
 
-            token = Leer.ReadLine(); 
+            token = Leer.ReadLine();
 
             while (token != "}")
             {
@@ -651,7 +649,7 @@ namespace Editordetexto
                 }
                 else if (token == "}")
                 {
-                    break; 
+                    break;
                 }
                 else
                 {
@@ -738,7 +736,7 @@ namespace Editordetexto
                 {
                     dentroComentarioBloque = false;
                     traducido.Append(c);
-                    i++; 
+                    i++;
                     traducido.Append('/');
                     continue;
                 }
@@ -764,7 +762,7 @@ namespace Editordetexto
                     {
                         traducido.Append(palabra);
                     }
-                    i--; 
+                    i--;
                 }
                 else
                 {
