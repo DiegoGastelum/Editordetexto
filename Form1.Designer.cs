@@ -14,7 +14,7 @@ namespace Editordetexto
         int i_caracter, N_error;
         char c_caracter;
         string archivo, archivoback, elemento,token;
-        int Numero_linea;
+        int Numero_linea=1;
         private List<string> P_Reservadas;
         /// <summary>
         /// Limpiar los recursos que se estén usando.
