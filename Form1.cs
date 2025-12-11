@@ -163,8 +163,14 @@ namespace Editordetexto
         private void Simbolo()
         {
             string s = ((char)i_caracter).ToString();
+            int siguiente = Leer.Peek(); 
 
-            if ("(){}[],;=+-*/%<>!&|#:".Contains(s))
+            if (s == "=" && siguiente == 61) { s = "=="; Leer.Read(); }
+            else if (s == "!" && siguiente == 61) { s = "!="; Leer.Read(); }
+            else if (s == "<" && siguiente == 61) { s = "<="; Leer.Read(); }
+            else if (s == ">" && siguiente == 61) { s = ">="; Leer.Read(); }
+
+            if ("(){}[],;=+-*/%<>!&|#:".Contains(((char)i_caracter).ToString()) || s.Length > 1)
             {
                 Escribir.Write(s + "\n");
             }
@@ -182,7 +188,7 @@ namespace Editordetexto
             {
                 char c = (char)i_caracter;
 
-                // Validación de ruptura (Saltos de línea)
+                // Validación de Saltos de línea
                 if (c == 10 || c == 13)
                 {
                     ErrorLexico("Cadena sin cerrar (Salto de línea encontrado).");
@@ -579,18 +585,15 @@ namespace Editordetexto
                         break;
 
                     case "return":
-                        token = NextToken(); 
+                        token = NextToken();
 
                         if (token != ";")
                         {
                             Expresion(); 
                         }
 
-                        if (token != ";")
-                        {
-                            Error(token, ";");
-                        }
-                        token = NextToken(); 
+                        if (token != ";") Error(token, ";");
+                        token = NextToken();
                         break;
 
                     case "identificador":
@@ -618,26 +621,31 @@ namespace Editordetexto
         {
             string id = token;
             token = NextToken();
-
-            if (token == "(") // Función
+            if (token == "(")
             {
                 token = NextToken();
-                while (token != ")" && token != "Fin") token = NextToken(); // Args
+                if (token != ")")
+                {
+                    while (true)
+                    {
+                        Expresion();
+                        if (token == ",") { token = NextToken(); continue; }
+                        else if (token == ")") break;
+                        else { Error(token, ", o )"); return; }
+                    }
+                }
                 token = NextToken();
                 if (token != ";") Error(token, ";");
                 token = NextToken();
             }
-            else if (token == "=") // Asignación
+            else if (token == "=")
             {
                 token = NextToken();
                 Expresion();
                 if (token != ";") Error(token, ";");
                 token = NextToken();
             }
-            else
-            {
-                Error(token, "'=' o '('");
-            }
+            else { Error(token, "'=' o '('"); }
         }
 
         // ==========================================
@@ -682,39 +690,47 @@ namespace Editordetexto
             if (token != "(") { Error(token, "("); return; }
             token = NextToken();
 
-            //  Init
             if (token == "int" || token == "float") Declaracion_Local();
             else if (token == "identificador") Sentencia();
             else if (token == ";") token = NextToken();
             else Error(token, "inicialización for");
 
-            //  Condicion
             if (token != ";") Expresion();
             if (token != ";") { Error(token, ";"); return; }
             token = NextToken();
 
-            // 3. Incremento 
             if (token != ")")
             {
+                bool esperaOperando = true;
                 while (token != ")" && token != "Fin")
                 {
-                    if (token == "identificador" || token == "numero_entero" ||
-                        token == "++" || token == "--" || token == "=" ||
-                        token == "+" || token == "-" || token == "*")
+                    if (token == "identificador" || token == "numero_entero" || token == "numero_real")
                     {
+                        if (!esperaOperando) { Error(token, "operador"); }
+                        esperaOperando = false;
+                        token = NextToken();
+                    }
+                    else if (token == "=" || token == "+" || token == "-" || token == "*" || token == "/")
+                    {
+                        esperaOperando = true;
+                        token = NextToken();
+                    }
+                    else if (token == "++" || token == "--")
+                    {
+                        esperaOperando = false;
                         token = NextToken();
                     }
                     else
                     {
-                        Error(token, "expresión de incremento válida");
-                        token = NextToken(); 
+                        Error(token, "expresión de incremento");
+                        token = NextToken();
                     }
                 }
+                if (esperaOperando) Error("Incremento incompleto");
             }
 
             if (token != ")") { Error(token, ")"); return; }
             token = NextToken();
-
             BloqueDeSentencias();
             token = NextToken();
         }
@@ -758,15 +774,16 @@ namespace Editordetexto
                     token = NextToken();
                     CuerpoDelCase();
                 }
-                else if (token == "default")
+                else if (token == "default") 
                 {
                     token = NextToken();
-                    if (token != ":") { Error(token, ":"); return; }
+                    if (token != ":") { Error(token, ":"); return; } 
                     token = NextToken();
                     CuerpoDelCase();
                 }
                 else
                 {
+                    Error($"Se esperaba 'case' o 'default', pero se encontró '{token}'");
                     token = NextToken();
                 }
             }
@@ -798,28 +815,69 @@ namespace Editordetexto
         // ==========================================
         //           AUXILIARES Y DECLARACIONES
         // ==========================================
+        private bool EsOperador(string t)
+        {
+            return t == "+" || t == "-" || t == "*" || t == "/" || t == "%" ||
+                   t == "=" || t == "==" || t == "!=" || t == ">" || t == "<" ||
+                   t == ">=" || t == "<=" || t == "&&" || t == "||" || t == "!";
+        }
 
         private void Expresion()
         {
+            bool esperaOperando = true;
             int parentesis = 0;
+
+            if (token == ")" || token == ";")
+            {
+                Error(token, "valor o variable");
+                return;
+            }
 
             while (token != ";" && token != "}" && token != null)
             {
-                if (token == "(") parentesis++;
+                if (token == "(")
+                {
+                    parentesis++;
+                    esperaOperando = true;
+                }
                 else if (token == ")")
                 {
+                    if (esperaOperando)
+                    {
+                        Error(token, "valor o variable");
+                        return;
+                    }
+
                     if (parentesis > 0) parentesis--;
-                    else break;
+                    else break; 
+
+                    esperaOperando = false;
                 }
                 else if (token == ",")
                 {
-                    if (parentesis == 0) break;
+                    if (parentesis == 0) break; 
+                    esperaOperando = true;
                 }
-
-                if (token == "}") break;
+                else if (EsOperador(token))
+                {
+                    if (esperaOperando && token != "-" && token != "!")
+                    {
+                        Error(token, "valor antes del operador");
+                    }
+                    esperaOperando = true;
+                }
+                else if (token == "identificador" || token == "numero_entero" ||
+                         token == "numero_real" || token == "Cadena" || token == "caracter")
+                {
+                    if (!esperaOperando) Error(token, "operador");
+                    esperaOperando = false;
+                }
 
                 token = NextToken();
             }
+
+            // Validación final: si terminamos esperando un operando (ej: "x = 5 +;")
+            if (esperaOperando) Error("Expresión incompleta");
         }
 
         private void Declaracion_Local()
