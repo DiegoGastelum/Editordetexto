@@ -16,6 +16,7 @@ namespace Editordetexto
         string archivo, archivoback, elemento,token;
         int Numero_linea=1;
         private List<string> P_Reservadas;
+        int linea_del_token = 1;
         /// <summary>
         /// Limpiar los recursos que se estén usando.
         /// </summary>
@@ -50,7 +51,6 @@ namespace Editordetexto
             this.compilarSoluciónToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.CajaTxt1 = new System.Windows.Forms.RichTextBox();
             this.TxtboxSalida = new System.Windows.Forms.RichTextBox();
-            this.traducciónToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -121,8 +121,7 @@ namespace Editordetexto
             // compilarToolStripMenuItem
             // 
             this.compilarToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.compilarSoluciónToolStripMenuItem,
-            this.traducciónToolStripMenuItem});
+            this.compilarSoluciónToolStripMenuItem});
             this.compilarToolStripMenuItem.Name = "compilarToolStripMenuItem";
             this.compilarToolStripMenuItem.Size = new System.Drawing.Size(68, 20);
             this.compilarToolStripMenuItem.Text = "Compilar";
@@ -155,13 +154,6 @@ namespace Editordetexto
             this.TxtboxSalida.TabIndex = 2;
             this.TxtboxSalida.Text = "";
             this.TxtboxSalida.TextChanged += new System.EventHandler(this.TxtboxSalida_TextChanged);
-            // 
-            // traducciónToolStripMenuItem
-            // 
-            this.traducciónToolStripMenuItem.Name = "traducciónToolStripMenuItem";
-            this.traducciónToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            this.traducciónToolStripMenuItem.Text = "Traducción";
-            this.traducciónToolStripMenuItem.Click += new System.EventHandler(this.traducciónToolStripMenuItem_Click);
             // 
             // Form1
             // 
@@ -196,7 +188,6 @@ namespace Editordetexto
         private System.Windows.Forms.ToolStripMenuItem abrirToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem compilarSoluciónToolStripMenuItem;
         private System.Windows.Forms.RichTextBox TxtboxSalida;
-        private System.Windows.Forms.ToolStripMenuItem traducciónToolStripMenuItem;
     }
 }
 
