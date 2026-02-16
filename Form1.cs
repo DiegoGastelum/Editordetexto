@@ -153,7 +153,7 @@ namespace Editordetexto
                     case 34: return '"';
                     case 39: return 'c';
                     case 32: return 'e';
-                    case 13: return 'e'; // Ignorar retorno de carro
+                    case 13: return 'e'; // Ignorar retorno
                     case 9: return 'e';  // Ignorar tabulador
                     default: return 's'; // Símbolo
                 }
@@ -416,7 +416,6 @@ namespace Editordetexto
 
                 if ((char)i_caracter == '/')
                 {
-                    // Verificar si es comentario o división
                     if (Comentario())
                     {
                         continue;
@@ -480,6 +479,15 @@ namespace Editordetexto
             token = NextToken();
             Cabecera();
             Leer.Close();
+
+            Leer = new StreamReader(archivo);
+            token = Leer.ReadToEnd(); 
+            Leer.Close();
+
+            if (!token.Contains("main("))
+            {
+                Error("Función 'main' ausente");
+            }
         }
 
         private void Cabecera()
@@ -524,6 +532,26 @@ namespace Editordetexto
                     }
                     break;
 
+                case "identificador":
+                    Error(token, "tipo de dato");
+
+                    token = NextToken();
+
+                    if (token == "(")
+                    {
+                        Parametros();
+                        BloqueDeSentencias();
+                        token = NextToken();
+                        Cabecera();
+                    }
+                    else
+                    {
+                        Declaracion_Variable_Global_Logica("identificador");
+                        token = NextToken();
+                        Cabecera();
+                    }
+                    break;
+
                 default:
                     token = NextToken();
                     Cabecera();
@@ -533,22 +561,47 @@ namespace Editordetexto
 
         private void Parametros()
         {
-            token = NextToken(); 
-            if (token == ")") { token = NextToken(); return; } // Main vacio
+            token = NextToken();
+            if (token == ")") { token = NextToken(); return; } // Main vacío
 
             while (token != ")" && token != "Fin")
             {
                 if (token != "int" && token != "float" && token != "char" && token != "double")
                     Error(token, "tipo de dato");
 
-                token = NextToken(); // ID
-                if (token != "identificador") { /* Validar */ }
-                token = NextToken();
-
-                if (token == ",") token = NextToken();
-                else if (token != ")") { Error(token, "',' o ')'"); return; }
+                token = NextToken(); 
+                if (token != "identificador")
+                {
+                    Error(token, "identificador");
+                    if (token == ",")
+                    {
+                        token = NextToken();
+                        continue;
+                    }
+                    if (token == ")") { token = NextToken(); return; }
+                    token = NextToken();
+                }
+                else
+                {
+                    token = NextToken();
+                }
+                if (token == ",")
+                {
+                    token = NextToken();
+                    if (token == ")")
+                    {
+                        Error(",", "identificador");
+                        return;
+                    }
+                    continue;
+                }
+                else if (token != ")")
+                {
+                    Error(token, "',' o ')'");
+                    return;
+                }
             }
-            token = NextToken(); 
+            token = NextToken();
         }
 
         // ==========================================
@@ -586,13 +639,22 @@ namespace Editordetexto
 
                     case "return":
                         token = NextToken();
-
+                        if (token == ";")
+                        {
+                            token = NextToken();
+                            break;
+                        }
+                        if (token == "}" || token == "Fin")
+                        {
+                            Error("return incompleto");
+                            break;
+                        }
+                        Expresion();
                         if (token != ";")
                         {
-                            Expresion(); 
+                            Error(token, ";");
                         }
 
-                        if (token != ";") Error(token, ";");
                         token = NextToken();
                         break;
 
@@ -629,9 +691,31 @@ namespace Editordetexto
                     while (true)
                     {
                         Expresion();
-                        if (token == ",") { token = NextToken(); continue; }
-                        else if (token == ")") break;
-                        else { Error(token, ", o )"); return; }
+
+                        if (token == ",")
+                        {
+                            token = NextToken();
+                            if (token == ")")
+                            {
+                                Error(",", "identificador");
+                                return;
+                            }
+                            continue;
+                        }
+                        else if (token == ")")
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            Error(token, ", o )");
+                            while (token != "," && token != ")" && token != ";" && token != "Fin" && token != null)
+                                token = NextToken();
+
+                            if (token == ",") { token = NextToken(); continue; }
+                            else if (token == ")") break;
+                            else return;
+                        }
                     }
                 }
                 token = NextToken();
@@ -833,51 +917,75 @@ namespace Editordetexto
                 return;
             }
 
-            while (token != ";" && token != "}" && token != null)
+            while (token != null && token != "Fin")
             {
+                if (token == ";" || token == "}") break;
+                if (token == "," && parentesis == 0) break;
+
                 if (token == "(")
                 {
                     parentesis++;
                     esperaOperando = true;
+                    token = NextToken();
+                    continue;
                 }
-                else if (token == ")")
-                {
+
+                if (token == ")")
+                {        
+                    if (parentesis == 0) break;
                     if (esperaOperando)
                     {
                         Error(token, "valor o variable");
                         return;
                     }
-
-                    if (parentesis > 0) parentesis--;
-                    else break; 
-
+                    parentesis--;
                     esperaOperando = false;
+                    token = NextToken();
+                    continue;
                 }
-                else if (token == ",")
-                {
-                    if (parentesis == 0) break; 
-                    esperaOperando = true;
-                }
-                else if (EsOperador(token))
+
+                if (EsOperador(token))
                 {
                     if (esperaOperando && token != "-" && token != "!")
                     {
                         Error(token, "valor antes del operador");
                     }
                     esperaOperando = true;
+                    token = NextToken();
+                    continue;
                 }
-                else if (token == "identificador" || token == "numero_entero" ||
-                         token == "numero_real" || token == "Cadena" || token == "caracter")
+
+                if (token == "identificador" || token == "printf")
+                {
+                    token = NextToken();
+
+                    if (token == "(")
+                    {
+                        parentesis++;
+                        token = NextToken();
+                        esperaOperando = true;
+                        continue;
+                    }
+                    else
+                    {
+                        esperaOperando = false;
+                        continue;
+                    }
+                }
+
+                if (token == "numero_entero" || token == "numero_real" || token == "Cadena" || token == "caracter")
                 {
                     if (!esperaOperando) Error(token, "operador");
                     esperaOperando = false;
+                    token = NextToken();
+                    continue;
                 }
-
-                token = NextToken();
+                break;
             }
 
-            // Validación final: si terminamos esperando un operando (ej: "x = 5 +;")
             if (esperaOperando) Error("Expresión incompleta");
+
+            if (parentesis > 0) Error("Paréntesis sin cerrar en la expresión");
         }
 
         private void Declaracion_Local()
