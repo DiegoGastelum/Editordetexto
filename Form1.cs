@@ -15,6 +15,22 @@ namespace Editordetexto
 {
     public partial class Form1 : Form
     {
+        // ==========================================
+        //           TABLA DE SÍMBOLOS 
+        // ==========================================
+        private class SimboloEntrada
+        {
+            public string nombre;
+            public string tipo;      // tipo de dato (int/float/void/..., o descripción)
+            public string categoria; // "variable", "funcion", "parametro"
+            public string ambito;    // "global" o nombre de la función
+            public int linea;
+        }
+
+        private List<SimboloEntrada> TablaSimbolos = new List<SimboloEntrada>();
+        private string AmbitoActual = "global";
+        private string archivoTabla = "tabla_simbolos.csv";
+
         public Form1()
         {
             InitializeComponent();
@@ -256,9 +272,11 @@ namespace Editordetexto
 
         private void Identificador()
         {
+            string nombre = "";
+
             do
             {
-                elemento += (char)i_caracter;
+                nombre += (char)i_caracter;
                 i_caracter = Leer.Read();
             } while (Tipo_caracter(i_caracter) == 'l' || Tipo_caracter(i_caracter) == 'd');
 
@@ -268,10 +286,14 @@ namespace Editordetexto
             }
             else
             {
+                elemento = nombre; // guardar el nombre real
                 if (Palabra_Reservada())
                     Escribir.Write(elemento.ToLower() + "\n");
                 else
-                    Escribir.Write("identificador\n");
+                {
+                    // Guardar token y nombre en archivo para el sintáctico
+                    Escribir.Write($"identificador:{elemento}\n");
+                }
             }
         }
 
@@ -370,7 +392,13 @@ namespace Editordetexto
 
         private void Error(string token, string esperado)
         {
-            TxtboxSalida.AppendText($"Error: se esperaba '{esperado}', pero se encontró '{token}', línea {linea_del_token}\n");
+            if (esperado == "redeclaración")
+                TxtboxSalida.AppendText($"Error semántico: la variable o función '{token}' ya fue declarada, línea {linea_del_token}\n");
+            else if (esperado == "función declarada")
+                TxtboxSalida.AppendText($"Error semántico: la función '{token}' no está declarada, línea {linea_del_token}\n");
+            else
+                TxtboxSalida.AppendText($"Error: se esperaba '{esperado}', pero se encontró '{token}', línea {linea_del_token}\n");
+
             N_error++;
         }
 
@@ -391,6 +419,12 @@ namespace Editordetexto
             }
 
             linea_del_token = Numero_linea;
+
+            if (t != null && t.StartsWith("identificador:"))
+            {
+                elemento = t.Split(':')[1]; // guarda el nombre real del identificador
+                return "identificador";
+            }
 
             return t;
         }
@@ -474,20 +508,28 @@ namespace Editordetexto
 
         private void AnalizadorSintactico()
         {
+            // Reiniciar tabla de símbolos
+            TablaSimbolos.Clear();
+            AmbitoActual = "global";
+
             Numero_linea = 1;
             Leer = new StreamReader(archivoback);
             token = NextToken();
             Cabecera();
             Leer.Close();
 
+            // Verificar que exista la función main en el archivo fuente original
             Leer = new StreamReader(archivo);
-            token = Leer.ReadToEnd(); 
+            string contenidoFuente = Leer.ReadToEnd();
             Leer.Close();
 
-            if (!token.Contains("main("))
+            if (!contenidoFuente.Contains("main("))
             {
                 Error("Función 'main' ausente");
             }
+
+            // Exportar tabla de símbolos en CSV
+            ExportarTablaSimbolosCSV();
         }
 
         private void Cabecera()
@@ -512,20 +554,28 @@ namespace Editordetexto
                 case "Tipo":
                     string tipo = token;
                     token = NextToken();
-                    string id = token;
+                    string id = elemento; // elemento contiene el nombre real del identificador
 
                     token = NextToken();
 
                     if (token == "(")
                     {
+                        AgregarSimbolo(id, tipo, "funcion", "global", linea_del_token);
+
+                        AmbitoActual = id;
+
                         Parametros();
                         BloqueDeSentencias();
+                        LimpiarAmbito(AmbitoActual);
+                        AmbitoActual = "global";
 
                         token = NextToken();
                         Cabecera();
                     }
                     else
                     {
+                        // Declaración global de variable
+                        AgregarSimbolo(id, tipo, "variable", "global", linea_del_token);
                         Declaracion_Variable_Global_Logica(id);
                         token = NextToken();
                         Cabecera();
@@ -562,14 +612,16 @@ namespace Editordetexto
         private void Parametros()
         {
             token = NextToken();
-            if (token == ")") { token = NextToken(); return; } // Main vacío
+            if (token == ")") { token = NextToken(); return; } // Función sin parámetros
 
             while (token != ")" && token != "Fin")
             {
                 if (token != "int" && token != "float" && token != "char" && token != "double")
                     Error(token, "tipo de dato");
 
-                token = NextToken(); 
+                string tipoParam = token;
+                token = NextToken();
+
                 if (token != "identificador")
                 {
                     Error(token, "identificador");
@@ -583,8 +635,11 @@ namespace Editordetexto
                 }
                 else
                 {
+                    // Registrar parámetro en la tabla con nombre real
+                    AgregarSimbolo(elemento, tipoParam, "parametro", AmbitoActual, linea_del_token);
                     token = NextToken();
                 }
+
                 if (token == ",")
                 {
                     token = NextToken();
@@ -681,10 +736,19 @@ namespace Editordetexto
 
         private void Sentencia()
         {
-            string id = token;
+            string id = elemento; // nombre real del identificador
             token = NextToken();
+
             if (token == "(")
             {
+                // Llamada a función: verificar existencia
+                var sym = ObtenerSimbolo(id);
+                if (sym == null && id != "printf" && id != "scanf")
+                {
+                    TxtboxSalida.AppendText($"Error: función '{id}' no declarada, línea {linea_del_token}\n");
+                    N_error++;
+                }
+
                 token = NextToken();
                 if (token != ")")
                 {
@@ -724,12 +788,26 @@ namespace Editordetexto
             }
             else if (token == "=")
             {
+                // Asignación: verificar existencia de variable
+                if (!ExisteSimbolo(id))
+                {
+                    Error(id, "declaración previa");
+                    // Recuperación: saltar la asignación
+                    token = NextToken();
+                    while (token != ";" && token != "Fin" && token != null) token = NextToken();
+                    if (token == ";") token = NextToken();
+                    return;
+                }
+
                 token = NextToken();
                 Expresion();
                 if (token != ";") Error(token, ";");
                 token = NextToken();
             }
-            else { Error(token, "'=' o '('"); }
+            else
+            {
+                Error(token, "'=' o '('");
+            }
         }
 
         // ==========================================
@@ -931,7 +1009,7 @@ namespace Editordetexto
                 }
 
                 if (token == ")")
-                {        
+                {
                     if (parentesis == 0) break;
                     if (esperaOperando)
                     {
@@ -955,8 +1033,15 @@ namespace Editordetexto
                     continue;
                 }
 
-                if (token == "identificador" || token == "printf")
+                if (token == "identificador")
                 {
+                    string nombreVar = elemento; // nombre real del identificador
+                    if (!ExisteSimbolo(nombreVar))
+                    {
+                        TxtboxSalida.AppendText($"Error semántico: variable '{nombreVar}' no declarada, línea {linea_del_token}\n");
+                        N_error++;
+                    }
+
                     token = NextToken();
 
                     if (token == "(")
@@ -990,11 +1075,28 @@ namespace Editordetexto
 
         private void Declaracion_Local()
         {
-            token = NextToken(); // ID
-            string id = token;
+            // token actualmente es el tipo (ej. "int")
+            string tipoLocal = token;
+
+            token = NextToken(); // ID esperado
+            if (token != "identificador")
+            {
+                Error(token, "identificador");
+                // Recuperar: avanzar hasta ';' o '}' o 'Fin'
+                while (token != ";" && token != "}" && token != "Fin" && token != null)
+                    token = NextToken();
+                if (token == ";") token = NextToken();
+                return;
+            }
+
+            string id = elemento; // nombre real del identificador
+
+            // Registrar variable en el ámbito actual
+            AgregarSimbolo(elemento, tipoLocal, "variable", AmbitoActual, linea_del_token);
+
             token = NextToken();
             Declaracion_Variable_Global_Logica(id);
-            token = NextToken(); 
+            token = NextToken();
         }
 
         private void Declaracion_Variable_Global_Logica(string identificador_actual)
@@ -1105,6 +1207,86 @@ namespace Editordetexto
             Error("Formato include");
             return 0;
         }
+
+        // ==========================================
+        //      MANEJO DE TABLA DE SÍMBOLOS
+        // ==========================================
+        private bool ExisteSimboloEnAmbito(string nombre, string ambito)
+        {
+            return TablaSimbolos.Exists(s => s.nombre == nombre && s.ambito == ambito);
+        }
+
+        private bool ExisteSimbolo(string nombre)
+        {
+            // Busca en ambito actual primero, luego en global
+            if (ExisteSimboloEnAmbito(nombre, AmbitoActual)) return true;
+            if (ExisteSimboloEnAmbito(nombre, "global")) return true;
+            return false;
+        }
+
+        private SimboloEntrada ObtenerSimbolo(string nombre)
+        {
+            var s = TablaSimbolos.Find(x => x.nombre == nombre && x.ambito == AmbitoActual);
+            if (s != null) return s;
+            return TablaSimbolos.Find(x => x.nombre == nombre && x.ambito == "global");
+        }
+
+        private void AgregarSimbolo(string nombre, string tipo, string categoria, string ambito, int linea)
+        {
+            // Ignorar funciones conocidas del sistema
+            if (nombre == "printf" || nombre == "scanf") return;
+
+            if (ExisteSimboloEnAmbito(nombre, ambito))
+            {
+                TxtboxSalida.AppendText($"Error: redeclaración de '{nombre}' en ámbito '{ambito}', línea {linea}\n");
+                N_error++;
+                return;
+            }
+
+            TablaSimbolos.Add(new SimboloEntrada
+            {
+                nombre = nombre,
+                tipo = tipo,
+                categoria = categoria,
+                ambito = ambito,
+                linea = linea
+            });
+        }
+
+        private void LimpiarAmbito(string ambito)
+        {
+            // Por si acaso
+        }
+
+        // ==========================================
+        //           EXPORTAR TABLA DE SÍMBOLOS
+        // ==========================================
+        private void ExportarTablaSimbolosCSV()
+        {
+            try
+            {
+                // Crear la ruta completa en la misma carpeta del archivo fuente 
+                string carpeta = Path.GetDirectoryName(archivo);
+                string nombreArchivo = Path.GetFileNameWithoutExtension(archivo) + "_tabla.csv";
+                archivoTabla = Path.Combine(carpeta, nombreArchivo);
+
+                using (StreamWriter tabla = new StreamWriter(archivoTabla))
+                {
+                    tabla.WriteLine("Nombre,Tipo,Categoría,Ámbito,Línea");
+                    foreach (var s in TablaSimbolos)
+                    {
+                        tabla.WriteLine($"{s.nombre},{s.tipo},{s.categoria},{s.ambito},{s.linea}");
+                    }
+                }
+
+                TxtboxSalida.AppendText($"\nTabla de símbolos guardada en '{archivoTabla}'\n");
+            }
+            catch (Exception ex)
+            {
+                TxtboxSalida.AppendText($"\nError al guardar tabla de símbolos: {ex.Message}\n");
+            }
+        }
+
 
         private void TxtboxSalida_TextChanged(object sender, EventArgs e)
         {
