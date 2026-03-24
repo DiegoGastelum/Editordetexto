@@ -179,14 +179,22 @@ namespace Editordetexto
         private void Simbolo()
         {
             string s = ((char)i_caracter).ToString();
-            int siguiente = Leer.Peek(); 
+            int siguiente = Leer.Peek();
 
+            // Operadores dobles
             if (s == "=" && siguiente == 61) { s = "=="; Leer.Read(); }
             else if (s == "!" && siguiente == 61) { s = "!="; Leer.Read(); }
             else if (s == "<" && siguiente == 61) { s = "<="; Leer.Read(); }
             else if (s == ">" && siguiente == 61) { s = ">="; Leer.Read(); }
 
-            if ("(){}[],;=+-*/%<>!&|#:".Contains(((char)i_caracter).ToString()) || s.Length > 1)
+            // 🔥 NUEVOS (CLAVE)
+            else if (s == "+" && siguiente == 43) { s = "++"; Leer.Read(); }
+            else if (s == "-" && siguiente == 45) { s = "--"; Leer.Read(); }
+            else if (s == "&" && siguiente == 38) { s = "&&"; Leer.Read(); }
+            else if (s == "|" && siguiente == 124) { s = "||"; Leer.Read(); }
+
+            // Validación
+            if ("(){}[],;=+-*/%<>!&|#:".Contains(s) || s.Length > 1)
             {
                 Escribir.Write(s + "\n");
             }
@@ -981,7 +989,8 @@ namespace Editordetexto
         {
             return t == "+" || t == "-" || t == "*" || t == "/" || t == "%" ||
                    t == "=" || t == "==" || t == "!=" || t == ">" || t == "<" ||
-                   t == ">=" || t == "<=" || t == "&&" || t == "||" || t == "!";
+                   t == ">=" || t == "<=" || t == "&&" || t == "||" || t == "!" ||
+                   t == "++" || t == "--";
         }
 
         private void Expresion()
@@ -989,17 +998,12 @@ namespace Editordetexto
             bool esperaOperando = true;
             int parentesis = 0;
 
-            if (token == ")" || token == ";")
-            {
-                Error(token, "valor o variable");
-                return;
-            }
-
             while (token != null && token != "Fin")
             {
                 if (token == ";" || token == "}") break;
                 if (token == "," && parentesis == 0) break;
 
+                // Paréntesis
                 if (token == "(")
                 {
                     parentesis++;
@@ -1011,31 +1015,61 @@ namespace Editordetexto
                 if (token == ")")
                 {
                     if (parentesis == 0) break;
+
                     if (esperaOperando)
                     {
                         Error(token, "valor o variable");
-                        return;
+                        esperaOperando = false; // 🔥 evitar cascada
                     }
+
                     parentesis--;
                     esperaOperando = false;
                     token = NextToken();
                     continue;
                 }
 
+                // Operadores
                 if (EsOperador(token))
                 {
-                    if (esperaOperando && token != "-" && token != "!")
+                    if (esperaOperando)
                     {
-                        Error(token, "valor antes del operador");
+                        // ✔ Unarios válidos
+                        if (token == "++" || token == "--" || token == "-" || token == "!")
+                        {
+                            token = NextToken();
+                            continue;
+                        }
+
+                        // ❌ '+' inválido como unario
+                        Error(token, "valor o variable");
+
+                        // 🔥 CLAVE: forzar recuperación SIN salir
+                        esperaOperando = true;
+                        token = NextToken();
+                        continue;
                     }
-                    esperaOperando = true;
-                    token = NextToken();
-                    continue;
+                    else
+                    {
+                        // ✔ Postfijo válido
+                        if (token == "++" || token == "--")
+                        {
+                            esperaOperando = false;
+                            token = NextToken();
+                            continue;
+                        }
+
+                        // ✔ Binario
+                        esperaOperando = true;
+                        token = NextToken();
+                        continue;
+                    }
                 }
 
+                // Identificadores
                 if (token == "identificador")
                 {
-                    string nombreVar = elemento; // nombre real del identificador
+                    string nombreVar = elemento;
+
                     if (!ExisteSimbolo(nombreVar))
                     {
                         TxtboxSalida.AppendText($"Error semántico: variable '{nombreVar}' no declarada, línea {linea_del_token}\n");
@@ -1047,30 +1081,36 @@ namespace Editordetexto
                     if (token == "(")
                     {
                         parentesis++;
-                        token = NextToken();
                         esperaOperando = true;
+                        token = NextToken();
                         continue;
                     }
-                    else
-                    {
-                        esperaOperando = false;
-                        continue;
-                    }
+
+                    esperaOperando = false;
+                    continue;
                 }
 
+                // Literales
                 if (token == "numero_entero" || token == "numero_real" || token == "Cadena" || token == "caracter")
                 {
-                    if (!esperaOperando) Error(token, "operador");
+                    if (!esperaOperando)
+                    {
+                        Error(token, "operador");
+                    }
+
                     esperaOperando = false;
                     token = NextToken();
                     continue;
                 }
+
                 break;
             }
 
-            if (esperaOperando) Error("Expresión incompleta");
+            if (esperaOperando)
+                Error("Expresión incompleta");
 
-            if (parentesis > 0) Error("Paréntesis sin cerrar en la expresión");
+            if (parentesis > 0)
+                Error("Paréntesis sin cerrar en la expresión");
         }
 
         private void Declaracion_Local()
