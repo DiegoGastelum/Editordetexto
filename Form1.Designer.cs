@@ -80,40 +80,40 @@ namespace Editordetexto
             // nuevoToolStripMenuItem
             // 
             this.nuevoToolStripMenuItem.Name = "nuevoToolStripMenuItem";
-            this.nuevoToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.nuevoToolStripMenuItem.Size = new System.Drawing.Size(150, 22);
             this.nuevoToolStripMenuItem.Text = "Nuevo";
             this.nuevoToolStripMenuItem.Click += new System.EventHandler(this.nuevoToolStripMenuItem_Click);
             // 
             // abrirToolStripMenuItem
             // 
             this.abrirToolStripMenuItem.Name = "abrirToolStripMenuItem";
-            this.abrirToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.abrirToolStripMenuItem.Size = new System.Drawing.Size(150, 22);
             this.abrirToolStripMenuItem.Text = "Abrir";
             this.abrirToolStripMenuItem.Click += new System.EventHandler(this.abrirToolStripMenuItem_Click);
             // 
             // gurdarToolStripMenuItem
             // 
             this.gurdarToolStripMenuItem.Name = "gurdarToolStripMenuItem";
-            this.gurdarToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.gurdarToolStripMenuItem.Size = new System.Drawing.Size(150, 22);
             this.gurdarToolStripMenuItem.Text = "Guardar";
             this.gurdarToolStripMenuItem.Click += new System.EventHandler(this.gurdarToolStripMenuItem_Click);
             // 
             // guardarComoToolStripMenuItem
             // 
             this.guardarComoToolStripMenuItem.Name = "guardarComoToolStripMenuItem";
-            this.guardarComoToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.guardarComoToolStripMenuItem.Size = new System.Drawing.Size(150, 22);
             this.guardarComoToolStripMenuItem.Text = "Guardar como";
             this.guardarComoToolStripMenuItem.Click += new System.EventHandler(this.guardarComoToolStripMenuItem_Click);
             // 
             // toolStripSeparator1
             // 
             this.toolStripSeparator1.Name = "toolStripSeparator1";
-            this.toolStripSeparator1.Size = new System.Drawing.Size(177, 6);
+            this.toolStripSeparator1.Size = new System.Drawing.Size(147, 6);
             // 
             // salirToolStripMenuItem
             // 
             this.salirToolStripMenuItem.Name = "salirToolStripMenuItem";
-            this.salirToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.salirToolStripMenuItem.Size = new System.Drawing.Size(150, 22);
             this.salirToolStripMenuItem.Text = "Salir";
             this.salirToolStripMenuItem.Click += new System.EventHandler(this.salirToolStripMenuItem_Click);
             // 
@@ -129,7 +129,7 @@ namespace Editordetexto
             // compilarSoluciónToolStripMenuItem
             // 
             this.compilarSoluciónToolStripMenuItem.Name = "compilarSoluciónToolStripMenuItem";
-            this.compilarSoluciónToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.compilarSoluciónToolStripMenuItem.Size = new System.Drawing.Size(116, 22);
             this.compilarSoluciónToolStripMenuItem.Text = "Analizar";
             this.compilarSoluciónToolStripMenuItem.Click += new System.EventHandler(this.compilarSoluciónToolStripMenuItem_Click);
             // 
@@ -146,10 +146,10 @@ namespace Editordetexto
             // TxtboxSalida
             // 
             this.TxtboxSalida.BackColor = System.Drawing.SystemColors.ScrollBar;
-            this.TxtboxSalida.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.TxtboxSalida.Location = new System.Drawing.Point(0, 381);
+            this.TxtboxSalida.Dock = System.Windows.Forms.DockStyle.Right;
+            this.TxtboxSalida.Location = new System.Drawing.Point(576, 24);
             this.TxtboxSalida.Name = "TxtboxSalida";
-            this.TxtboxSalida.Size = new System.Drawing.Size(800, 69);
+            this.TxtboxSalida.Size = new System.Drawing.Size(224, 426);
             this.TxtboxSalida.TabIndex = 2;
             this.TxtboxSalida.Text = "";
             this.TxtboxSalida.TextChanged += new System.EventHandler(this.TxtboxSalida_TextChanged);

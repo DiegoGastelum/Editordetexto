@@ -1,4 +1,5 @@
-﻿using System;
+﻿using System.Globalization;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -25,6 +26,7 @@ namespace Editordetexto
             public string categoria; // "variable", "funcion", "parametro"
             public string ambito;    // "global" o nombre de la función
             public int linea;
+            public string valor;
         }
 
         private List<SimboloEntrada> TablaSimbolos = new List<SimboloEntrada>();
@@ -179,22 +181,14 @@ namespace Editordetexto
         private void Simbolo()
         {
             string s = ((char)i_caracter).ToString();
-            int siguiente = Leer.Peek();
+            int siguiente = Leer.Peek(); 
 
-            // Operadores dobles
             if (s == "=" && siguiente == 61) { s = "=="; Leer.Read(); }
             else if (s == "!" && siguiente == 61) { s = "!="; Leer.Read(); }
             else if (s == "<" && siguiente == 61) { s = "<="; Leer.Read(); }
             else if (s == ">" && siguiente == 61) { s = ">="; Leer.Read(); }
 
-            // 🔥 NUEVOS (CLAVE)
-            else if (s == "+" && siguiente == 43) { s = "++"; Leer.Read(); }
-            else if (s == "-" && siguiente == 45) { s = "--"; Leer.Read(); }
-            else if (s == "&" && siguiente == 38) { s = "&&"; Leer.Read(); }
-            else if (s == "|" && siguiente == 124) { s = "||"; Leer.Read(); }
-
-            // Validación
-            if ("(){}[],;=+-*/%<>!&|#:".Contains(s) || s.Length > 1)
+            if ("(){}[],;=+-*/%<>!&|#:".Contains(((char)i_caracter).ToString()) || s.Length > 1)
             {
                 Escribir.Write(s + "\n");
             }
@@ -236,14 +230,16 @@ namespace Editordetexto
 
         private void Caracter()
         {
-            i_caracter = Leer.Read(); 
+            i_caracter = Leer.Read();
 
-            if (i_caracter == -1 || i_caracter == 39) // 39 es '
+            if (i_caracter == -1 || i_caracter == 39)
             {
                 ErrorLexico("Carácter vacío o incompleto");
                 if (i_caracter == 39) i_caracter = Leer.Read();
                 return;
             }
+
+            elemento = ((char)i_caracter).ToString();
 
             int cierre = Leer.Read();
             if (cierre != 39)
@@ -253,8 +249,7 @@ namespace Editordetexto
                 return;
             }
 
-            Escribir.Write("caracter\n");
-
+            Escribir.Write("caracter:" + elemento + "\n");
             i_caracter = Leer.Read();
         }
 
@@ -307,8 +302,11 @@ namespace Editordetexto
 
         private void Numero()
         {
+            elemento = "";
+
             do
             {
+                elemento += (char)i_caracter;
                 i_caracter = Leer.Read();
             } while (Tipo_caracter(i_caracter) == 'd');
 
@@ -318,19 +316,21 @@ namespace Editordetexto
                 return;
             }
 
-            Escribir.Write("numero_entero\n");
+            Escribir.Write("numero_entero:" + elemento + "\n");
         }
 
         private void Numero_Real()
         {
+            elemento += ".";
             i_caracter = Leer.Read();
 
             while (Tipo_caracter(i_caracter) == 'd')
             {
+                elemento += (char)i_caracter;
                 i_caracter = Leer.Read();
             }
 
-            Escribir.Write("numero_real\n");
+            Escribir.Write("numero_real:" + elemento + "\n");
         }
 
         private bool Comentario()
@@ -430,8 +430,26 @@ namespace Editordetexto
 
             if (t != null && t.StartsWith("identificador:"))
             {
-                elemento = t.Split(':')[1]; // guarda el nombre real del identificador
+                elemento = t.Substring("identificador:".Length);
                 return "identificador";
+            }
+
+            if (t != null && t.StartsWith("numero_entero:"))
+            {
+                elemento = t.Substring("numero_entero:".Length);
+                return "numero_entero";
+            }
+
+            if (t != null && t.StartsWith("numero_real:"))
+            {
+                elemento = t.Substring("numero_real:".Length);
+                return "numero_real";
+            }
+
+            if (t != null && t.StartsWith("caracter:"))
+            {
+                elemento = t.Substring("caracter:".Length);
+                return "caracter";
             }
 
             return t;
@@ -702,22 +720,50 @@ namespace Editordetexto
 
                     case "return":
                         token = NextToken();
+
                         if (token == ";")
                         {
                             token = NextToken();
                             break;
                         }
+
                         if (token == "}" || token == "Fin")
                         {
                             Error("return incompleto");
                             break;
                         }
-                        Expresion();
-                        if (token != ";")
+
+                        NodoArbol raizReturn = AnalizarExpresionMatematica();
+                        if (raizReturn != null)
                         {
-                            Error(token, ";");
+                            string tipoResultado;
+                            bool calculable;
+                            string valorResultado = EvaluarArbol(raizReturn, out tipoResultado, out calculable);
+
+                            MostrarResultadoArbol(raizReturn, tipoResultado, valorResultado, calculable);
+
+                            SimboloEntrada funcion = TablaSimbolos.Find(s => s.nombre == AmbitoActual && s.categoria == "funcion");
+                            if (funcion != null)
+                            {
+                                if (funcion.tipo == "void")
+                                {
+                                    TxtboxSalida.AppendText($"Error semántico: la función '{AmbitoActual}' es void y no debe devolver valor, línea {linea_del_token}\n");
+                                    N_error++;
+                                }
+                                else if (!TiposCompatibles(funcion.tipo, tipoResultado))
+                                {
+                                    TxtboxSalida.AppendText($"Error semántico: return de tipo {tipoResultado} incompatible con función '{AmbitoActual}' de tipo {funcion.tipo}, línea {linea_del_token}\n");
+                                    N_error++;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            while (token != ";" && token != "Fin" && token != null)
+                                token = NextToken();
                         }
 
+                        if (token != ";") Error(token, ";");
                         token = NextToken();
                         break;
 
@@ -744,63 +790,64 @@ namespace Editordetexto
 
         private void Sentencia()
         {
-            string id = elemento; // nombre real del identificador
+            string id = (token == "identificador") ? elemento : token;
             token = NextToken();
 
+            // Llamada a función
             if (token == "(")
             {
-                // Llamada a función: verificar existencia
-                var sym = ObtenerSimbolo(id);
-                if (sym == null && id != "printf" && id != "scanf")
+                // Verificar que la función exista
+                if (!ExisteSimbolo(id) && id != "printf" && id != "scanf")
                 {
-                    TxtboxSalida.AppendText($"Error: función '{id}' no declarada, línea {linea_del_token}\n");
+                    TxtboxSalida.AppendText($"Error semántico: función '{id}' no declarada, línea {linea_del_token}\n");
                     N_error++;
                 }
 
                 token = NextToken();
+
                 if (token != ")")
                 {
                     while (true)
                     {
-                        Expresion();
+                        NodoArbol argArbol = AnalizarExpresionMatematica();
+                        if (argArbol != null)
+                        {
+                            string tipoArg; bool calcArg;
+                            string valArg = EvaluarArbol(argArbol, out tipoArg, out calcArg);
+                            MostrarResultadoArbol(argArbol, tipoArg, valArg, calcArg);
+                        }
 
                         if (token == ",")
                         {
                             token = NextToken();
-                            if (token == ")")
-                            {
-                                Error(",", "identificador");
-                                return;
-                            }
+                            if (token == ")") { Error("Coma extra antes de ')'"); break; }
                             continue;
                         }
-                        else if (token == ")")
-                        {
-                            break;
-                        }
+                        else if (token == ")") break;
                         else
                         {
-                            Error(token, ", o )");
+                            Error(token, "',' o ')'");
                             while (token != "," && token != ")" && token != ";" && token != "Fin" && token != null)
                                 token = NextToken();
-
                             if (token == ",") { token = NextToken(); continue; }
                             else if (token == ")") break;
                             else return;
                         }
                     }
                 }
-                token = NextToken();
+
+                token = NextToken(); 
                 if (token != ";") Error(token, ";");
                 token = NextToken();
             }
+
+            // Asignación
             else if (token == "=")
             {
-                // Asignación: verificar existencia de variable
                 if (!ExisteSimbolo(id))
                 {
-                    Error(id, "declaración previa");
-                    // Recuperación: saltar la asignación
+                    TxtboxSalida.AppendText($"Error semántico: variable '{id}' no declarada, línea {linea_del_token}\n");
+                    N_error++;
                     token = NextToken();
                     while (token != ";" && token != "Fin" && token != null) token = NextToken();
                     if (token == ";") token = NextToken();
@@ -808,7 +855,37 @@ namespace Editordetexto
                 }
 
                 token = NextToken();
-                Expresion();
+
+                NodoArbol raiz = AnalizarExpresionMatematica();
+
+                if (raiz != null)
+                {
+                    string tipoResultado; bool calculable;
+                    string valorResultado = EvaluarArbol(raiz, out tipoResultado, out calculable);
+
+                    MostrarResultadoArbol(raiz, tipoResultado, valorResultado, calculable);
+
+                    SimboloEntrada sim = ObtenerSimbolo(id);
+                    if (sim != null)
+                    {
+                        if (!TiposCompatibles(sim.tipo, tipoResultado))
+                        {
+                            TxtboxSalida.AppendText($"Error semántico: no se puede asignar tipo '{tipoResultado}' a '{id}' de tipo '{sim.tipo}', línea {linea_del_token}\n");
+                            N_error++;
+                        }
+                        else if (calculable)
+                        {
+                            sim.valor = valorResultado; // actualizar valor en tabla de símbolos
+                        }
+                    }
+                }
+                else
+                {
+                    // raiz es null porque hubo error en la expresión
+                    while (token != ";" && token != "Fin" && token != null)
+                        token = NextToken();
+                }
+
                 if (token != ";") Error(token, ";");
                 token = NextToken();
             }
@@ -989,8 +1066,521 @@ namespace Editordetexto
         {
             return t == "+" || t == "-" || t == "*" || t == "/" || t == "%" ||
                    t == "=" || t == "==" || t == "!=" || t == ">" || t == "<" ||
-                   t == ">=" || t == "<=" || t == "&&" || t == "||" || t == "!" ||
-                   t == "++" || t == "--";
+                   t == ">=" || t == "<=" || t == "&&" || t == "||" || t == "!";
+        }
+        private class NodoArbol
+        {
+            public string dato;
+            public NodoArbol izquierda;
+            public NodoArbol derecha;
+        }
+
+        private bool EsTipoNumerico(string tipo)
+        {
+            return tipo == "int" || tipo == "float" || tipo == "double" || tipo == "char";
+        }
+
+        private bool EsTipoEntero(string tipo)
+        {
+            return tipo == "int" || tipo == "char";
+        }
+
+        private bool TiposCompatibles(string destino, string origen)
+        {
+            if (destino == null || origen == null || origen == "desconocido") return false;
+            if (destino == origen) return true;
+
+            if ((destino == "float" || destino == "double") &&
+                (origen == "int" || origen == "char" || origen == "float" || origen == "double"))
+                return true;
+
+            if (destino == "int" && (origen == "int" || origen == "char"))
+                return true;
+
+            if (destino == "char" && (origen == "char" || origen == "int"))
+                return true;
+
+            return false;
+        }
+
+        private string NombreNodo(string dato)
+        {
+            if (dato == null) return "";
+            if (dato.StartsWith("num:")) return dato.Substring(4);
+            if (dato.StartsWith("car:")) return "'" + dato.Substring(4) + "'";
+            if (dato.StartsWith("id:")) return dato.Substring(3);
+            if (dato.StartsWith("fun:")) return dato.Substring(4) + "()";
+            if (dato == "neg") return "(negativo)";
+            return dato;
+        }
+
+        private void MostrarArbol(NodoArbol nodo, string nivel)
+        {
+            if (nodo == null) return;
+            TxtboxSalida.AppendText($"{nivel}{NombreNodo(nodo.dato)}\n");
+            MostrarArbol(nodo.izquierda, nivel + "  |--");
+            MostrarArbol(nodo.derecha, nivel + "  |--");
+        }
+
+        private bool ArbolTieneOperadores(NodoArbol nodo)
+        {
+            if (nodo == null) return false;
+            if (nodo.izquierda != null || nodo.derecha != null) return true;
+            return false;
+        }
+
+        private void MostrarResultadoArbol(NodoArbol raiz, string tipoResultado, string valorResultado, bool calculable)
+        {
+            if (raiz == null) return;
+            if (!ArbolTieneOperadores(raiz)) return;
+
+            TxtboxSalida.AppendText("\n--- Árbol de expresión ---\n");
+            MostrarArbol(raiz, "");
+            TxtboxSalida.AppendText($"Nodo raíz    : {NombreNodo(raiz.dato)}\n");
+            TxtboxSalida.AppendText($"Tipo inferido: {tipoResultado}\n");
+
+            if (calculable)
+                TxtboxSalida.AppendText($"Resultado    : {valorResultado}\n");
+            else
+                TxtboxSalida.AppendText("Resultado    : no calculable (variables sin valor conocido)\n");
+
+            TxtboxSalida.AppendText("--------------------------\n");
+        }
+
+        private string FormatearNumero(double valor, string tipo)
+        {
+            if (tipo == "int")
+                return ((long)Math.Round(valor)).ToString(CultureInfo.InvariantCulture);
+
+            return valor.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private NodoArbol AnalizarExpresionMatematica()
+        {
+            NodoArbol raiz = AnalizarExpresionSuma();
+
+            // Operadores relacionales y lógicos
+            while (token == "==" || token == "!=" || token == "<" || token == ">" ||
+                   token == "<=" || token == ">=" || token == "&&" || token == "||")
+            {
+                string op = token;
+                token = NextToken();
+
+                NodoArbol derecho = AnalizarExpresionSuma();
+                if (derecho == null)
+                {
+                    Error($"Se esperaba operando después de '{op}'");
+                    return raiz;
+                }
+
+                raiz = new NodoArbol { dato = op, izquierda = raiz, derecha = derecho };
+            }
+
+            return raiz;
+        }
+
+        private NodoArbol AnalizarExpresionSuma()
+        {
+            NodoArbol raiz = AnalizarTerminoMatematico();
+
+            while (token == "+" || token == "-")
+            {
+                string op = token;
+                token = NextToken();
+
+                NodoArbol derecho = AnalizarTerminoMatematico();
+                if (derecho == null)
+                {
+                    Error($"Se esperaba operando después de '{op}'");
+                    return raiz;
+                }
+
+                raiz = new NodoArbol { dato = op, izquierda = raiz, derecha = derecho };
+            }
+
+            return raiz;
+        }
+
+        private NodoArbol AnalizarTerminoMatematico()
+        {
+            NodoArbol raiz = AnalizarFactorMatematico();
+
+            while (token == "*" || token == "/" || token == "%")
+            {
+                string op = token;
+                token = NextToken();
+
+                NodoArbol derecho = AnalizarFactorMatematico();
+                if (derecho == null)
+                {
+                    Error($"Se esperaba operando después de '{op}'");
+                    return raiz;
+                }
+
+                raiz = new NodoArbol { dato = op, izquierda = raiz, derecha = derecho };
+            }
+
+            return raiz;
+        }
+
+        private NodoArbol AnalizarFactorMatematico()
+        {
+            // Negativo unario
+            if (token == "-")
+            {
+                token = NextToken();
+                NodoArbol hijo = AnalizarFactorMatematico();
+                if (hijo == null) { Error("Se esperaba valor después de '-'"); return null; }
+                return new NodoArbol { dato = "neg", derecha = hijo };
+            }
+
+            // NOT lógico
+            if (token == "!")
+            {
+                token = NextToken();
+                NodoArbol hijo = AnalizarFactorMatematico();
+                if (hijo == null) { Error("Se esperaba valor después de '!'"); return null; }
+                return new NodoArbol { dato = "!", derecha = hijo };
+            }
+
+            // Paréntesis
+            if (token == "(")
+            {
+                token = NextToken();
+                NodoArbol nodo = AnalizarExpresionMatematica();
+                if (token != ")")
+                {
+                    Error(token, ")");
+                    return nodo; // intentar continuar
+                }
+                token = NextToken();
+                return nodo;
+            }
+
+            // Número entero o real
+            if (token == "numero_entero" || token == "numero_real")
+            {
+                NodoArbol nodo = new NodoArbol { dato = "num:" + elemento };
+                token = NextToken();
+                return nodo;
+            }
+
+            // Literal carácter
+            if (token == "caracter")
+            {
+                NodoArbol nodo = new NodoArbol { dato = "car:" + elemento };
+                token = NextToken();
+                return nodo;
+            }
+
+            if (token == "Cadena")
+            {
+                NodoArbol nodo = new NodoArbol { dato = "cadena" };
+                token = NextToken();
+                return nodo;
+            }
+
+            // Identificador o llamada a función
+            if (token == "identificador")
+            {
+                string nombre = elemento;
+
+                // Verificar que la variable/función esté declarada
+                if (!ExisteSimbolo(nombre))
+                {
+                    TxtboxSalida.AppendText($"Error semántico: '{nombre}' no declarado, línea {linea_del_token}\n");
+                    N_error++;
+                }
+                else
+                {
+                    SimboloEntrada sim = ObtenerSimbolo(nombre);
+                    if (sim != null && sim.categoria == "funcion")
+                    {
+
+                    }
+                }
+
+                token = NextToken();
+                if (token == "(")
+                {
+                    token = NextToken();
+
+                    if (token != ")")
+                    {
+                        // Analizar argumentos
+                        while (true)
+                        {
+                            NodoArbol arg = AnalizarExpresionMatematica();
+
+                            if (token == ",")
+                            {
+                                token = NextToken();
+                                if (token == ")")
+                                {
+                                    Error("Coma extra antes de ')'");
+                                    break;
+                                }
+                                continue;
+                            }
+                            else if (token == ")")
+                            {
+                                break;
+                            }
+                            else
+                            {
+                                Error(token, "',' o ')'");
+                                while (token != ")" && token != ";" && token != "Fin" && token != null)
+                                    token = NextToken();
+                                if (token == ")") break;
+                                return null;
+                            }
+                        }
+                    }
+
+                    token = NextToken();
+
+                    return new NodoArbol { dato = "fun:" + nombre };
+                }
+                else
+                {
+                    SimboloEntrada sim = ObtenerSimbolo(nombre);
+                    if (sim != null && sim.categoria == "funcion")
+                    {
+                        TxtboxSalida.AppendText($"Error semántico: '{nombre}' es una función, se esperaban paréntesis '()', línea {linea_del_token}\n");
+                        N_error++;
+                    }
+
+                    return new NodoArbol { dato = "id:" + nombre };
+                }
+            }
+
+            // Si llega aquí, el token no es un valor válido
+            if (token != ";" && token != ")" && token != "}" && token != "," && token != "Fin" && token != null)
+            {
+                Error(token, "valor o variable");
+            }
+            return null;
+        }
+
+        private string ObtenerValorHoja(string dato, out string tipo, out bool calculable)
+        {
+            calculable = true;
+            tipo = "desconocido";
+
+            if (dato.StartsWith("num:"))
+            {
+                string valor = dato.Substring(4);
+                tipo = valor.Contains(".") ? "double" : "int";
+                return valor;
+            }
+
+            if (dato.StartsWith("car:"))
+            {
+                tipo = "char";
+                string ch = dato.Substring(4);
+                if (ch.Length > 0)
+                    return ((int)ch[0]).ToString(CultureInfo.InvariantCulture);
+                calculable = false;
+                return null;
+            }
+
+            if (dato == "cadena")
+            {
+                tipo = "char*";
+                calculable = false;
+                return null;
+            }
+
+            if (dato.StartsWith("id:"))
+            {
+                string nombre = dato.Substring(3);
+                SimboloEntrada s = ObtenerSimbolo(nombre);
+                if (s == null) { calculable = false; return null; }
+
+                tipo = s.tipo;
+
+                if (string.IsNullOrEmpty(s.valor)) { calculable = false; return null; }
+
+                // Intentar parsear el valor almacenado como número
+                double tmp;
+                if (double.TryParse(s.valor, NumberStyles.Float, CultureInfo.InvariantCulture, out tmp))
+                    return s.valor;
+
+                // Si es un carácter guardado como letra, convertir a entero
+                if (s.valor.Length > 0)
+                    return ((int)s.valor[0]).ToString(CultureInfo.InvariantCulture);
+
+                calculable = false;
+                return null;
+            }
+
+            if (dato.StartsWith("fun:"))
+            {
+                string nombre = dato.Substring(4);
+                SimboloEntrada s = ObtenerSimbolo(nombre);
+                tipo = (s != null) ? s.tipo : "desconocido";
+                calculable = false;
+                return null;
+            }
+
+            calculable = false;
+            return null;
+        }
+
+        private string EvaluarArbol(NodoArbol nodo, out string tipo, out bool calculable)
+        {
+            tipo = "desconocido";
+            calculable = true;
+
+            if (nodo == null) { calculable = false; return null; }
+
+            // ---- Nodo hoja ----
+            if (nodo.izquierda == null && nodo.derecha == null)
+                return ObtenerValorHoja(nodo.dato, out tipo, out calculable);
+
+            // ---- Negativo unario ----
+            if (nodo.dato == "neg")
+            {
+                string tipoH; bool calcH;
+                string valorH = EvaluarArbol(nodo.derecha, out tipoH, out calcH);
+                tipo = tipoH;
+                if (!calcH || !EsTipoNumerico(tipoH) || valorH == null) { calculable = false; return null; }
+
+                double num;
+                if (!double.TryParse(valorH, NumberStyles.Float, CultureInfo.InvariantCulture, out num))
+                { calculable = false; return null; }
+
+                return FormatearNumero(-num, tipo);
+            }
+
+            // ---- NOT lógico ----
+            if (nodo.dato == "!")
+            {
+                string tipoH; bool calcH;
+                string valorH = EvaluarArbol(nodo.derecha, out tipoH, out calcH);
+                tipo = "int";
+                if (!calcH || valorH == null) { calculable = false; return null; }
+
+                double num;
+                if (!double.TryParse(valorH, NumberStyles.Float, CultureInfo.InvariantCulture, out num))
+                { calculable = false; return null; }
+
+                return (num == 0 ? "1" : "0");
+            }
+
+            // ---- Operadores binarios ----
+            string ti, td; bool ci, cd;
+            string vi = EvaluarArbol(nodo.izquierda, out ti, out ci);
+            string vd = EvaluarArbol(nodo.derecha, out td, out cd);
+
+            // Operadores relacionales y lógicos 
+            if (nodo.dato == "==" || nodo.dato == "!=" || nodo.dato == "<" || nodo.dato == ">" ||
+                nodo.dato == "<=" || nodo.dato == ">=" || nodo.dato == "&&" || nodo.dato == "||")
+            {
+                tipo = "int";
+
+                // Verificar que los operandos sean numéricos
+                if (!EsTipoNumerico(ti) || !EsTipoNumerico(td))
+                {
+                    TxtboxSalida.AppendText($"Error semántico: operador '{nodo.dato}' requiere operandos numéricos, línea {linea_del_token}\n");
+                    N_error++;
+                    calculable = false;
+                    return null;
+                }
+
+                calculable = ci && cd && vi != null && vd != null;
+                if (!calculable) return null;
+
+                double a, b;
+                if (!double.TryParse(vi, NumberStyles.Float, CultureInfo.InvariantCulture, out a) ||
+                    !double.TryParse(vd, NumberStyles.Float, CultureInfo.InvariantCulture, out b))
+                { calculable = false; return null; }
+
+                bool resultado = false;
+                switch (nodo.dato)
+                {
+                    case "==": resultado = (a == b); break;
+                    case "!=": resultado = (a != b); break;
+                    case "<": resultado = (a < b); break;
+                    case ">": resultado = (a > b); break;
+                    case "<=": resultado = (a <= b); break;
+                    case ">=": resultado = (a >= b); break;
+                    case "&&": resultado = (a != 0 && b != 0); break;
+                    case "||": resultado = (a != 0 || b != 0); break;
+                }
+                return resultado ? "1" : "0";
+            }
+
+            // Operadores aritméticos
+            if (!EsTipoNumerico(ti) || !EsTipoNumerico(td))
+            {
+                TxtboxSalida.AppendText($"Error semántico: operador '{nodo.dato}' requiere operandos numéricos (se encontró '{ti}' y '{td}'), línea {linea_del_token}\n");
+                N_error++;
+                tipo = "desconocido";
+                calculable = false;
+                return null;
+            }
+
+            // Módulo
+            if (nodo.dato == "%" && (!EsTipoEntero(ti) || !EsTipoEntero(td)))
+            {
+                TxtboxSalida.AppendText($"Error semántico: el operador '%' solo acepta operandos enteros (se encontró '{ti}' y '{td}'), línea {linea_del_token}\n");
+                N_error++;
+                tipo = "desconocido";
+                calculable = false;
+                return null;
+            }
+
+            // Tipo resultante
+            tipo = (ti == "double" || td == "double") ? "double" :
+                   (ti == "float" || td == "float") ? "float" : "int";
+
+            calculable = ci && cd && vi != null && vd != null;
+            if (!calculable) return null;
+
+            double numA, numB;
+            if (!double.TryParse(vi, NumberStyles.Float, CultureInfo.InvariantCulture, out numA) ||
+                !double.TryParse(vd, NumberStyles.Float, CultureInfo.InvariantCulture, out numB))
+            { calculable = false; return null; }
+
+            double res = 0;
+            switch (nodo.dato)
+            {
+                case "+": res = numA + numB; break;
+                case "-": res = numA - numB; break;
+                case "*": res = numA * numB; break;
+
+                case "/":
+                    if (Math.Abs(numB) < 0.0000001)
+                    {
+                        TxtboxSalida.AppendText($"Error semántico: división entre cero, línea {linea_del_token}\n");
+                        N_error++;
+                        calculable = false;
+                        return null;
+                    }
+                    if (EsTipoEntero(ti) && EsTipoEntero(td))
+                        res = Math.Truncate(numA / numB);
+                    else
+                        res = numA / numB;
+                    break;
+
+                case "%":
+                    long la = (long)numA, lb = (long)numB;
+                    if (lb == 0)
+                    {
+                        TxtboxSalida.AppendText($"Error semántico: módulo entre cero, línea {linea_del_token}\n");
+                        N_error++;
+                        calculable = false;
+                        return null;
+                    }
+                    return (la % lb).ToString(CultureInfo.InvariantCulture);
+
+                default:
+                    calculable = false;
+                    return null;
+            }
+
+            return FormatearNumero(res, tipo);
         }
 
         private void Expresion()
@@ -998,12 +1588,17 @@ namespace Editordetexto
             bool esperaOperando = true;
             int parentesis = 0;
 
+            if (token == ")" || token == ";")
+            {
+                Error(token, "valor o variable");
+                return;
+            }
+
             while (token != null && token != "Fin")
             {
                 if (token == ";" || token == "}") break;
                 if (token == "," && parentesis == 0) break;
 
-                // Paréntesis
                 if (token == "(")
                 {
                     parentesis++;
@@ -1015,61 +1610,31 @@ namespace Editordetexto
                 if (token == ")")
                 {
                     if (parentesis == 0) break;
-
                     if (esperaOperando)
                     {
                         Error(token, "valor o variable");
-                        esperaOperando = false; // 🔥 evitar cascada
+                        return;
                     }
-
                     parentesis--;
                     esperaOperando = false;
                     token = NextToken();
                     continue;
                 }
 
-                // Operadores
                 if (EsOperador(token))
                 {
-                    if (esperaOperando)
+                    if (esperaOperando && token != "-" && token != "!")
                     {
-                        // ✔ Unarios válidos
-                        if (token == "++" || token == "--" || token == "-" || token == "!")
-                        {
-                            token = NextToken();
-                            continue;
-                        }
-
-                        // ❌ '+' inválido como unario
-                        Error(token, "valor o variable");
-
-                        // 🔥 CLAVE: forzar recuperación SIN salir
-                        esperaOperando = true;
-                        token = NextToken();
-                        continue;
+                        Error(token, "valor antes del operador");
                     }
-                    else
-                    {
-                        // ✔ Postfijo válido
-                        if (token == "++" || token == "--")
-                        {
-                            esperaOperando = false;
-                            token = NextToken();
-                            continue;
-                        }
-
-                        // ✔ Binario
-                        esperaOperando = true;
-                        token = NextToken();
-                        continue;
-                    }
+                    esperaOperando = true;
+                    token = NextToken();
+                    continue;
                 }
 
-                // Identificadores
                 if (token == "identificador")
                 {
-                    string nombreVar = elemento;
-
+                    string nombreVar = elemento; // nombre real del identificador
                     if (!ExisteSimbolo(nombreVar))
                     {
                         TxtboxSalida.AppendText($"Error semántico: variable '{nombreVar}' no declarada, línea {linea_del_token}\n");
@@ -1081,48 +1646,41 @@ namespace Editordetexto
                     if (token == "(")
                     {
                         parentesis++;
-                        esperaOperando = true;
                         token = NextToken();
+                        esperaOperando = true;
                         continue;
                     }
-
-                    esperaOperando = false;
-                    continue;
+                    else
+                    {
+                        esperaOperando = false;
+                        continue;
+                    }
                 }
 
-                // Literales
                 if (token == "numero_entero" || token == "numero_real" || token == "Cadena" || token == "caracter")
                 {
-                    if (!esperaOperando)
-                    {
-                        Error(token, "operador");
-                    }
-
+                    if (!esperaOperando) Error(token, "operador");
                     esperaOperando = false;
                     token = NextToken();
                     continue;
                 }
-
                 break;
             }
 
-            if (esperaOperando)
-                Error("Expresión incompleta");
+            if (esperaOperando) Error("Expresión incompleta");
 
-            if (parentesis > 0)
-                Error("Paréntesis sin cerrar en la expresión");
+            if (parentesis > 0) Error("Paréntesis sin cerrar en la expresión");
         }
 
         private void Declaracion_Local()
         {
-            // token actualmente es el tipo (ej. "int")
+            // token actualmente es el tipo
             string tipoLocal = token;
 
             token = NextToken(); // ID esperado
             if (token != "identificador")
             {
                 Error(token, "identificador");
-                // Recuperar: avanzar hasta ';' o '}' o 'Fin'
                 while (token != ";" && token != "}" && token != "Fin" && token != null)
                     token = NextToken();
                 if (token == ";") token = NextToken();
@@ -1157,25 +1715,41 @@ namespace Editordetexto
             if (token == "=")
             {
                 token = NextToken();
+
                 if (token == "{")
                 {
                     BloqueInicializacion();
                 }
                 else
                 {
-                    if (token == "-") token = NextToken();
-                    if (token != "numero_entero" && token != "numero_real" &&
-                        token != "Cadena" && token != "caracter" && token != "identificador")
+                    NodoArbol raiz = AnalizarExpresionMatematica();
+
+                    if (raiz != null)
                     {
-                        Error(token, "valor inicialización");
-                        return;
+                        string tipoResultado;
+                        bool calculable;
+                        string valorResultado = EvaluarArbol(raiz, out tipoResultado, out calculable);
+
+                        MostrarResultadoArbol(raiz, tipoResultado, valorResultado, calculable);
+
+                        SimboloEntrada sim = ObtenerSimbolo(identificador_actual);
+                        if (sim != null)
+                        {
+                            if (!TiposCompatibles(sim.tipo, tipoResultado))
+                            {
+                                TxtboxSalida.AppendText($"Error semántico: no se puede asignar una expresión de tipo {tipoResultado} a '{identificador_actual}' de tipo {sim.tipo}, línea {linea_del_token}\n");
+                                N_error++;
+                            }
+                            else if (calculable)
+                            {
+                                sim.valor = valorResultado;
+                            }
+                        }
                     }
-                    token = NextToken();
-                    if (token == ".")
+                    else
                     {
-                        token = NextToken();
-                        if (token != "numero_entero") { Error(token, "decimal"); return; }
-                        token = NextToken();
+                        while (token != ";" && token != "Fin" && token != null)
+                            token = NextToken();
                     }
                 }
             }
